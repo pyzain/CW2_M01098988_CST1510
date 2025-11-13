@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+env/
+venv/
+
+# IDE
+.idea/
+
+# Data & DB to not commit
+intelligence_platform.db
+*.db
+
+# OS
+.DS_Store
+Thumbs.db

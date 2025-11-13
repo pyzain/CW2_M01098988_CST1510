@@ -76,5 +76,3 @@ if __name__ == "__main__":
         login_user(username, password)
     else:
         print("⚠️ Invalid choice. Please run again and choose 'r' or 'l'.")
-
-# jhjhkhk
