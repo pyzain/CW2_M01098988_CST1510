@@ -1,0 +1,1 @@
+2025-11-15T16:20:15.692491 - DB auth not available; falling back to file-based auth. Import error: ModuleNotFoundError("No module named 'app.services'")
