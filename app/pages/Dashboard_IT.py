@@ -365,3 +365,50 @@ def it_dashboard():
         **Marking guidance:** The dashboard demonstrates core features (authentication, DB, visualisations), clear explanations, code modularity, and analytic recommendations suitable for the project report.
         """
     )
+
+# ===== HF AI Assistant: IT =====
+from app.common.ai_client import generate_answer_hf, get_history
+
+IT_SYSTEM_PROMPT = """You are an IT operations expert assistant.
+Help troubleshoot issues, optimize systems, and manage tickets."""
+
+# Ensure keys exist
+if "ai_q_it" not in st.session_state:
+    st.session_state["ai_q_it"] = ""
+if "ai_last_response_it" not in st.session_state:
+    st.session_state["ai_last_response_it"] = ""
+
+with st.expander("AI Assistant — IT Operations (Ask about tickets, triage, root cause)"):
+    # Use a form so input isn't lost on rerun
+    with st.form(key="ai_form_it", clear_on_submit=False):
+        st.text("Tip: Ask about ticket prioritization, SLA breaches, or troubleshooting steps.")
+        q = st.text_area("Question for IT assistant:", key="ai_q_it", height=120)
+        submit = st.form_submit_button("Ask IT Assistant")
+
+    if submit:
+        if not st.session_state["ai_q_it"].strip():
+            st.warning("Please type a question.")
+        else:
+            with st.spinner("AI thinking..."):
+                answer = generate_answer_hf("it", st.session_state["ai_q_it"], system_prompt=IT_SYSTEM_PROMPT)
+                st.session_state["ai_last_response_it"] = answer
+
+    # show errors if any
+    if "_ai_last_error" in st.session_state:
+        st.error(st.session_state["_ai_last_error"])
+
+    # display last answer
+    if st.session_state.get("ai_last_response_it"):
+        st.markdown("**AI:**")
+        st.write(st.session_state["ai_last_response_it"])
+
+    # display short chat history
+    hist = get_history("it")
+    if hist:
+        st.markdown("**Chat history (latest first)**")
+        for item in reversed(hist[-12:]):
+            role = item.get("role", "")
+            text = item.get("text", "")
+            label = "**Assistant:**" if role.lower() == "assistant" else "**User:**"
+            st.write(f"{label} {text}")
+

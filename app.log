@@ -1,1 +1,2 @@
 2025-11-15T16:20:15.692491 - DB auth not available; falling back to file-based auth. Import error: ModuleNotFoundError("No module named 'app.services'")
+2025-11-26T10:46:19.793992 - HF client init error: HF_API_KEY environment variable not set.

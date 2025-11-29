@@ -4,3 +4,8 @@ pandas
 matplotlib
 plotly
 sqlalchemy
+gpt4all
+sentence-transformers
+numpy
+faiss-cpu   # optional: faster nearest neighbors (if available), else we fallback to numpy
+transformers  # required by some sentence-transformers installs

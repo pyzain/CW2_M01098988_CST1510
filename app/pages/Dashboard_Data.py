@@ -90,3 +90,50 @@ def data_dashboard():
     st.download_button("Download filtered datasets CSV", csv_bytes, file_name="filtered_datasets.csv", mime="text/csv")
 
     st.info("Use the sidebar filters to explore different datasets dynamically.")
+
+# ===== HF AI Assistant: Data =====
+from app.common.ai_client import generate_answer_hf, get_history
+
+DATA_SYSTEM_PROMPT = """You are a data science expert assistant.
+Help with analysis, visualization, and statistical insights."""
+
+# Ensure keys exist
+if "ai_q_data" not in st.session_state:
+    st.session_state["ai_q_data"] = ""
+if "ai_last_response_data" not in st.session_state:
+    st.session_state["ai_last_response_data"] = ""
+
+with st.expander("AI Assistant — Data Science (Ask about datasets, analysis)"):
+    with st.form(key="ai_form_data", clear_on_submit=False):
+        st.text("Tip: Ask about dataset size, archiving suggestions, or visualization ideas.")
+        q = st.text_area("Question for Data assistant:", key="ai_q_data", height=120)
+        submit = st.form_submit_button("Ask Data Assistant")
+
+    if submit:
+        if not st.session_state["ai_q_data"].strip():
+            st.warning("Please type a question.")
+        else:
+            with st.spinner("AI thinking..."):
+                answer = generate_answer_hf("data", st.session_state["ai_q_data"], system_prompt=DATA_SYSTEM_PROMPT)
+                st.session_state["ai_last_response_data"] = answer
+
+    # show errors if any
+    if "_ai_last_error" in st.session_state:
+        st.error(st.session_state["_ai_last_error"])
+
+    # display last answer
+    if st.session_state.get("ai_last_response_data"):
+        st.markdown("**AI:**")
+        st.write(st.session_state["ai_last_response_data"])
+
+    # display short chat history
+    hist = get_history("data")
+    if hist:
+        st.markdown("**Chat history (latest first)**")
+        for item in reversed(hist[-12:]):
+            role = item.get("role", "")
+            text = item.get("text", "")
+            label = "**Assistant:**" if role.lower() == "assistant" else "**User:**"
+            st.write(f"{label} {text}")
+
+
