@@ -116,3 +116,26 @@ Alternative:
 ```bash
 streamlit run app/main_app.py
 ```
+
+
+# Multi‑Domain Intelligence Platform
+
+This system integrates **Cybersecurity**, **Data Science**, **IT Operations**, and an **AI Assistant** under a unified Streamlit platform.
+
+## Features
+- OOP architecture
+- Entity models (User, Incident, Dataset, Ticket)
+- Service classes (DB, Auth, AI)
+- Modular pages
+- Extensible AI integration
+
+## How to run
+```
+
+pip install -r requirements.txt
+streamlit run main_app.py
+
+## Project Structure
+```
+
+```

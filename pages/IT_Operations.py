@@ -1,146 +1,211 @@
 # pages/IT_Operations.py
 """
-IT Operations dashboard - shows tickets and basic SLA view.
-Dark theme consistent with other pages.
-Tabs: Overview | Trends | Data | AI
+💻 IT Operations Dashboard
+-------------------------
+- KPIs for tickets
+- Visualizations for priorities, status, and assignees
+- Create/update tickets
+- Integrated IT assistant using AIAssistant(role_prompt)
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from pathlib import Path
+from app.models.it_ticket import (
+    get_all_tickets_df,
+    create_ticket,
+    update_ticket_status,
+    get_ticket_by_id
+)
+from ai_core import AIAssistant
 
-try:
-    from app.services.ai_assistant import AIAssistant
-except Exception:
-    AIAssistant = None
+def render():
+    # 1️⃣ Require login
+    if not st.session_state.get("user"):
+        st.warning("Please login from Home before viewing IT Operations dashboard.")
+        return
 
-def _inject_css():
-    st.markdown(
-        """
-        <style>
-        .stApp { background-color: #0b0f14; color: #e6eef6; }
-        .kpi-card { background: linear-gradient(90deg, rgba(5,10,15,0.9), rgba(15,20,30,0.6)); border-radius: 8px; padding: 12px;}
-        </style>
-        """,
-        unsafe_allow_html=True,
+    st.title("💻 IT Operations Dashboard")
+    st.write("Monitor tickets, visualize KPIs, and get AI assistance.")
+
+    # 2️⃣ Load tickets
+    df = get_all_tickets_df()
+
+    # 3️⃣ If no tickets, allow creating test tickets
+    if df.empty:
+        st.info("No IT tickets found. You can create a test ticket below.")
+        with st.expander("Create a test ticket manually"):
+            pr = st.selectbox("Priority", ["low", "medium", "high"], index=1)
+            desc = st.text_area("Description", "")
+            ass = st.text_input("Assign to", "unassigned")
+            if st.button("Create ticket (test)"):
+                tid = create_ticket(pr, desc, ass)
+                st.success(f"Created ticket id {tid}. Refresh the page to see it.")
+        return
+
+    # 4️⃣ KPI cards
+    total = len(df)
+    open_cnt = df[df["status"].str.lower() != "resolved"].shape[0]
+    high_pr = df[df["priority"].str.lower() == "high"].shape[0]
+    avg_res_hours = round(df["resolution_time_hours"].dropna().astype(float).mean(), 2) if "resolution_time_hours" in df.columns and not df["resolution_time_hours"].dropna().empty else 0
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total tickets", total)
+    k2.metric("Open tickets", open_cnt)
+    k3.metric("High priority", high_pr)
+    k4.metric("Avg. resolution time (hrs)", avg_res_hours)
+
+    st.markdown("---")
+
+    # 5️⃣ Visualizations
+    st.subheader("Ticket Visualizations")
+
+    # Priority distribution (pie)
+    fig_priority = px.pie(
+        df,
+        names="priority",
+        title="Priority Distribution",
+        hole=0.4
     )
+    st.plotly_chart(fig_priority, use_container_width=True)
 
-class TicketsLoader:
-    def __init__(self):
-        self.PROJECT_ROOT = Path(__file__).resolve().parents[1]
-        self.csv_path = self.PROJECT_ROOT / "data" / "it_tickets.csv"
+    # Status distribution (bar)
+    status_counts = df["status"].value_counts().reset_index()
+    status_counts.columns = ["status_name", "count"]  # Rename explicitly
+    fig_status = px.bar(
+        status_counts,
+        x="status_name",
+        y="count",
+        labels={"status_name": "Status", "count": "Count"},
+        title="Tickets by Status",
+        color="status_name"
+    )
+    st.plotly_chart(fig_status, use_container_width=True)
 
-    def load(self):
+    # Tickets per assignee (bar)
+    assignee_counts = df["assigned_to"].value_counts().reset_index()
+    assignee_counts.columns = ["assignee", "count"]
+    fig_assignee = px.bar(
+        assignee_counts,
+        x="assignee",
+        y="count",
+        labels={"assignee": "Assignee", "count": "Tickets"},
+        title="Tickets per Assignee",
+        color="count"
+    )
+    st.plotly_chart(fig_assignee, use_container_width=True)
+
+    st.markdown("---")
+
+    # 6️⃣ Show top 100 tickets
+    st.subheader("Recent Tickets (top 100)")
+    st.dataframe(df.head(100), use_container_width=True)
+
+    st.markdown("---")
+
+    # 7️⃣ Create new ticket form
+    st.subheader("Create New Ticket")
+    with st.form("create_ticket_form", clear_on_submit=True):
+        p = st.selectbox("Priority", ["low", "medium", "high"], index=1)
+        description = st.text_area("Description", placeholder="Brief description")
+        assigned_to = st.text_input("Assign to", value="unassigned")
+        submitted = st.form_submit_button("Create Ticket")
+        if submitted:
+            new_id = create_ticket(p, description, assigned_to)
+            st.success(f"Created ticket with ID {new_id}.")
+            st.rerun()
+
+    st.markdown("---")
+
+    # 8️⃣ Update ticket status
+    st.subheader("Update Ticket Status")
+    ticket_choices = df["ticket_id"].astype(str).tolist()
+    if ticket_choices:
+        sel = st.selectbox("Select ticket ID", ticket_choices)
+        sel_id = int(sel)
+        current = get_ticket_by_id(sel_id)
+        st.markdown(f"**Current Status:** {current.get('status')} — Assigned to **{current.get('assigned_to')}**")
+        new_status = st.selectbox("New Status", ["open", "in progress", "resolved", "closed"], index=0)
+        res_time = st.number_input("Resolution Time (hrs) — optional", min_value=0.0, value=0.0, step=0.5)
+        if st.button("Apply Update"):
+            rt_val = res_time if res_time > 0 else None
+            update_ticket_status(sel_id, new_status, rt_val)
+            st.success("Ticket updated successfully.")
+            st.rerun()
+    else:
+        st.info("No tickets to update.")
+
+    st.markdown("---")
+
+    # -----------------------------------------
+    # AI Assistant (IT Dashboard)
+    # -----------------------------------------
+    st.subheader("💻 IT Systems Assistant")
+
+    if "it_chat" not in st.session_state:
+        st.session_state.it_chat = []
+
+    for msg in st.session_state.it_chat:
+        speaker = "🧑 You" if msg["role"] == "user" else "🤖 Assistant"
+        st.markdown(f"**{speaker}:** {msg['content']}")
+
+    st.markdown("---")
+
+    user_query = st.text_input("Ask an IT or systems question...", key="it_input")
+    send = st.button("Send")
+    clear = st.button("Clear Chat")
+
+    if clear:
+        st.session_state.it_chat = []
+        st.rerun()
+
+    if send and user_query.strip():
+
+        st.session_state.it_chat.append({"role": "user", "content": user_query})
+
+        history = "\n".join(
+            [f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
+             for m in st.session_state.it_chat]
+        )
+
+        # ---- SMART SNAPSHOT (IT) ----
         try:
-            from database.db import connect_database
-            conn = connect_database()
-            df = pd.read_sql_query("SELECT * FROM it_tickets", conn)
-            conn.close()
-            if df is not None and not df.empty:
-                return df
+            snapshot = "=== IT Dashboard Snapshot ===\n"
+
+            # schema
+            snapshot += "\nColumns:\n" + ", ".join(dff.columns)
+
+            # health states
+            if "status" in dff.columns:
+                snapshot += "\n\nSystem status counts:\n"
+                snapshot += dff["status"].value_counts().to_string()
+
+            # recent failures / warnings
+            if "status" in dff.columns and "timestamp" in dff.columns:
+                failures = dff[dff["status"].isin(["error", "down", "failed"])] \
+                    .sort_values("timestamp", ascending=False) \
+                    .head(10)
+                snapshot += "\n\nRecent failures:\n" + failures.to_string()
+
+            # filtered sample
+            snapshot += "\n\nFiltered sample (first 15):\n"
+            snapshot += dff.head(15).to_string()
+
         except Exception:
-            pass
+            snapshot = "(Snapshot unavailable)"
 
-        # CSV fallback (assume columns if headerless)
-        if self.csv_path.exists():
-            df = pd.read_csv(self.csv_path, header=0)
-            return df
-        return pd.DataFrame(columns=["ticket_id", "title", "priority", "status", "assigned_to", "created_at", "resolved_at"])
+        ai = AIAssistant(
+            role_prompt=(
+                "You are a senior IT systems engineer. "
+                "Explain root causes, system health, troubleshooting steps, "
+                "and help users understand logs or specific entries."
+            )
+        )
 
-class ITOperationsDashboard:
-    def __init__(self):
-        _inject_css()
-        self.df = TicketsLoader().load()
-        self.df.columns = [str(c).strip().lower().replace(" ", "_") for c in self.df.columns]
+        reply = ai.ask(
+            query=user_query,
+            data_context=f"{snapshot}\n\n=== Conversation ===\n{history}"
+        )
 
-    def _sidebar(self):
-        st.sidebar.header("Filters")
-        priorities = sorted(self.df["priority"].dropna().unique().tolist()) if "priority" in self.df.columns else []
-        statuses = sorted(self.df["status"].dropna().unique().tolist()) if "status" in self.df.columns else []
-        sel_pr = st.sidebar.multiselect("Priority", options=priorities, default=priorities)
-        sel_st = st.sidebar.multiselect("Status", options=statuses, default=statuses)
-        return sel_pr, sel_st
-
-    def _kpis(self, df):
-        total = len(df)
-        open_count = df[df["status"].str.lower() == "open"].shape[0] if "status" in df.columns else 0
-        high_pr = df[df["priority"].str.lower() == "high"].shape[0] if "priority" in df.columns else 0
-        avg_res_time = "-"
-        if "created_at" in df.columns and "resolved_at" in df.columns and not df["resolved_at"].dropna().empty:
-            try:
-                created = pd.to_datetime(df["created_at"], errors="coerce")
-                resolved = pd.to_datetime(df["resolved_at"], errors="coerce")
-                avg = (resolved - created).dt.total_seconds().mean() / 3600.0
-                avg_res_time = f"{avg:.1f}h"
-            except Exception:
-                avg_res_time = "-"
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(f'<div class="kpi-card"><h3 style="margin:0;color:#6ef0c5">Tickets</h3><h2 style="margin:0">{total}</h2></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="kpi-card"><h3 style="margin:0;color:#9bd1ff">Open</h3><h2 style="margin:0">{open_count}</h2></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="kpi-card"><h3 style="margin:0;color:#ffb86b">High priority</h3><h2 style="margin:0">{high_pr}</h2></div>', unsafe_allow_html=True)
-        c4.markdown(f'<div class="kpi-card"><h3 style="margin:0;color:#ff6b6b">Avg res time</h3><h2 style="margin:0">{avg_res_time}</h2></div>', unsafe_allow_html=True)
-
-    def _overview(self, df):
-        st.markdown("### Overview")
-        self._kpis(df)
-        with st.expander("Sample tickets"):
-            st.dataframe(df.head(10))
-
-    def _trends(self, df):
-        st.markdown("### Trends")
-        if "created_at" in df.columns:
-            df["created_at_dt"] = pd.to_datetime(df["created_at"], errors="coerce")
-            cts = df.groupby(df["created_at_dt"].dt.floor("d")).size().reset_index(name="count")
-            fig = px.line(cts, x="created_at_dt", y="count", title="Tickets created per day")
-            st.plotly_chart(fig, use_container_width=True)
-        if "priority" in df.columns:
-            pc = df["priority"].value_counts().reset_index()
-            pc.columns = ["priority", "count"]
-            fig2 = px.bar(pc, x="priority", y="count", title="Tickets by priority")
-            st.plotly_chart(fig2, use_container_width=True)
-
-    def _data(self, df):
-        st.markdown("### Data")
-        st.dataframe(df, height=300)
-        st.download_button("Download tickets CSV", df.to_csv(index=False).encode("utf-8"), file_name="it_tickets_export.csv")
-
-    def _ai(self, df):
-        st.markdown("### AI Insight")
-        prompt = "Summarize ticket workload and recommend priorities to reduce backlog."
-        if st.button("Ask AI about tickets"):
-            if AIAssistant is None:
-                st.error("AIAssistant not available.")
-                return
-            try:
-                ai = AIAssistant(system_prompt="You are an IT operations assistant.")
-                ctx = df.head(10).to_dict(orient="records")
-                ans = ai.ask(f"{prompt}\n\nSample tickets: {ctx}")
-                st.write(ans)
-            except Exception as e:
-                st.error(f"AI error: {e}")
-
-    def render(self):
-        st.title("💻 IT Operations — Tickets")
-        sel_pr, sel_st = self._sidebar()
-        df = self.df.copy()
-        if "priority" in df.columns and sel_pr:
-            df = df[df["priority"].isin(sel_pr)]
-        if "status" in df.columns and sel_st:
-            df = df[df["status"].isin(sel_st)]
-
-        t1, t2, t3, t4 = st.tabs(["Overview", "Trends", "Data", "AI"])
-        with t1:
-            self._overview(df)
-        with t2:
-            self._trends(df)
-        with t3:
-            self._data(df)
-        with t4:
-            self._ai(df)
-
-if __name__ == "__main__":
-    ITOperationsDashboard().render()
-else:
-    ITOperationsDashboard().render()
+        st.session_state.it_chat.append({"role": "assistant", "content": reply})
+        st.rerun()
