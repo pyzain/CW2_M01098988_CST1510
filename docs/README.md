@@ -1,141 +1,267 @@
-# CW2 – Multi-Domain Intelligence Platform
+# **📘 Multi-Domain Intelligence (MDI) Platform**
 
-## Overview
-This is a **beginner-friendly Streamlit project** that unifies three domain dashboards in one platform:
+A unified Streamlit application that brings together **Cybersecurity**, **Data Science**, **IT Operations**, and an **AI Assistant** into one easy-to-use, interactive dashboard.
 
-- 🛡️ **Cybersecurity** — analyze and visualize incident trends  
-- 🖥️ **IT Operations** — track and visualize service tickets  
-- 📊 **Data Science** — explore datasets and generate usage insights  
-
-The app includes secure login using **bcrypt**, optional local SQLite database, and interactive visualizations.
+This platform is designed for learning, analysis, and intelligent decision-making across multiple operational domains. It includes full **user authentication**, **admin management**, **visual analytics**, and an embedded **AI reasoning engine** powered by OpenAI/HuggingFace models.
 
 ---
 
-### 1. Create a Virtual Environment
-```bash
-python -m venv .venv
-```
+# **🚀 Features Overview**
 
-### 2. Activate the Environment
-- **Windows (PowerShell)**:
-```bash
-.venv\Scripts\Activate.ps1
-```
-- **macOS / Linux**:
-```bash
-source .venv/bin/activate
-```
+### ✅ **1. Secure User Authentication**
 
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+* SHA-256 password hashing
+* Login / Logout
+* Role-based access (User / Admin)
 
-### 4. Initialize Database & Sample Data
-```bash
-python migration_script.py
-```
-This creates `DATA/intelligence_platform.db` (optional) and sample user/data files.
+### ✅ **2. Admin Panel**
 
-### 5. Run the App
-- **Option A (recommended)**:
-```bash
-python run_app.py
-```
-- **Option B (direct Streamlit launch)**:
-```bash
-streamlit run app/main_app.py
-```
+* Create users
+* Delete users
+* Reset passwords
+* Export user list as CSV
 
-### Demo Login
-- **Username:** demo  
-- **Password:** demo123  
+### ✅ **3. Multi-Domain Dashboards**
 
-Or register a new account from the **Register** tab on the login page. Credentials are saved in `DATA/users.txt`.
+Each dashboard follows the same structure for consistency:
+
+#### **🛡 Cybersecurity Dashboard**
+
+* Incident dataset analysis
+* KPI summary
+* Visual trends (attack types, severity, timelines)
+* AI assistant for cybersecurity guidance
+
+#### **📊 Data Science Dashboard**
+
+* Dataset catalog with filters
+* Visualizations (histogram, bar charts, scatterplots)
+* Snapshot-based AI assistant that interprets data, explains ML concepts, and guides preprocessing
+
+#### **🛠 IT Operations Dashboard**
+
+* IT tickets overview
+* KPIs and charts
+* AI assistant for troubleshooting guidance
+
+### ✅ **4. AI Assistant (Global)**
+
+* Full conversational interface
+* Domain-aware responses
+* Memory-based context snapshots
+* Can answer general questions or domain-specific ones
+* Configurable through `.streamlit/secrets`
+
+### ✅ **5. Built-in SQLite Database**
+
+* Automatic initialization on first run
+* `platform.db` stores users + all domain datasets
+* Clean separation using a Database Manager service
 
 ---
 
-## Project Structure
+# **📁 Project Structure**
+
 ```
-CW2_M0123456_CST1510/
+CW2_M01098988_CST1510/
+├─ ai_core.py 
 ├─ app/
-│  ├─ main_app.py               # Streamlit orchestrator
-│  ├─ run_all.py / run_app.py   # Optional launcher
-│  ├─ common/
-│  │  └─ auth_cli.py            # Handles password hashing & verification
-│  └─ pages/
-│     ├─ Login.py
-│     ├─ Dashboard_Cyber.py
-│     ├─ Dashboard_IT.py
-│     └─ Dashboard_Data.py
-├─ DATA/
-│  ├─ users.txt                 # Stores username,hashed_password
-│  ├─ cyber_incidents.csv
-│  ├─ it_tickets.csv
-│  └─ datasets_metadata.csv
-├─ migration_script.py
-├─ requirements.txt
-└─ README.md
+│  ├─ components/
+│  ├─ models/
+│  │  ├─ dataset.py 
+│  │  ├─ it_ticket.py 
+│  │  ├─ security_incident.py 
+│  │  ├─ user.py 
+│  ├─ services/
+│  │  ├─ ai_assistant.py 
+│  │  ├─ auth_manager.py 
+│  │  ├─ database_manager.py 
+├─ data/
+│  ├─ cyber_incidents.csv 
+│  ├─ datasets_metadata.csv 
+│  ├─ it_tickets.csv 
+├─ database/
+│  ├─ db.py 
+│  ├─ db_initializer.py 
+│  ├─ platform.db 
+├─ docs/
+│  ├─ README.md 
+├─ img/
+├─ main_app.py 
+├─ make_admin_script.py 
+├─ pages/
+│  ├─ AI_Assistant.py 
+│  ├─ Cybersecurity.py 
+│  ├─ Data_Science.py 
+│  ├─ Home.py 
+│  ├─ IT_Operations.py 
+│  ├─ users_admin.py 
+├─ requirements.txt 
 ```
 
 ---
 
-## How Login Works
-1. Passwords are hashed with **bcrypt** and saved in `DATA/users.txt`.  
-2. Streamlit stores the login session in `st.session_state`.  
-3. Once logged in, you can access all dashboards via the sidebar.
+# **⚙️ Installation & Setup**
 
----
+### **1️⃣ Clone the Repository**
 
-## Dashboards Overview
-- **Cybersecurity:** Shows incident trends and status counts.  
-- **IT Operations:** Visualizes tickets by category, status, and priority.  
-- **Data Science:** Summarizes datasets, shows missing values, and visualizes data distributions.
-
----
-
-## Common Issues & Fixes
-- **Module import errors (`No module named 'app'`)**:  
-  Run from project root or use `python run_app.py`.
-- **Registration not saving**:  
-  Ensure `DATA/` exists and has write permission; run `migration_script.py`.
-- **Streamlit rerun errors**:  
-  Upgrade Streamlit: `pip install --upgrade streamlit`.
-
----
-
-## Author
-**Name:** Zain  
-**Course:** CST1510  
-
-### Recommended Run Command:
 ```bash
-python run_app.py
+git clone https://github.com/your-username/mdi-platform.git
+cd mdi-platform
 ```
-Alternative:
+
+### **2️⃣ Install Requirements**
+
 ```bash
-streamlit run app/main_app.py
-```
-
-
-# Multi‑Domain Intelligence Platform
-
-This system integrates **Cybersecurity**, **Data Science**, **IT Operations**, and an **AI Assistant** under a unified Streamlit platform.
-
-## Features
-- OOP architecture
-- Entity models (User, Incident, Dataset, Ticket)
-- Service classes (DB, Auth, AI)
-- Modular pages
-- Extensible AI integration
-
-## How to run
-```
-
 pip install -r requirements.txt
+```
+
+### **3️⃣ Create `.streamlit/secrets.toml`**
+
+This is required for the AI Assistant.
+
+👉 **Create this folder and file:**
+
+```
+.streamlit/
+   └── secrets.toml
+```
+
+👉 **Add your API key:**
+
+```toml
+OPENAI_API_KEY = "your_api_key_here"
+HF_TOKEN = "optional_huggingface_token"
+```
+
+⚠️ Without this file, the AI features will not work.
+
+### **4️⃣ Initialize Database**
+
+Runs automatically when you launch the app.
+
+If needed manually:
+
+```bash
+python make_admin_script.py
+```
+
+### **5️⃣ Run the App**
+
+```bash
 streamlit run main_app.py
-
-## Project Structure
 ```
 
+---
+
+# **🧩 How the App Works**
+
+### **Streamlit UI (Views)**
+
+* Located in `/pages/`
+* Each page follows a modular structure (`render()` function)
+
+### **Business Logic (Controllers)**
+
+* Authentication
+* Database operations
+* AI processing
+  Located in:
+
 ```
+app/services/
+```
+
+### **Data Models (Models)**
+
+Located in:
+
+```
+app/models/
+```
+
+They define:
+
+* User
+* Dataset
+* SecurityIncident
+* ITTicket
+
+---
+
+# **🤖 AI Assistant (Technical Notes)**
+
+### Uses:
+
+* OpenAI ChatCompletions API (default)
+* HuggingFace text-generation models (fallback)
+
+### Smart Features:
+
+* Adds dataset snapshots (Data Science)
+* Adds ticket snapshots (IT Ops)
+* Adds incident summaries (Cybersecurity)
+* Maintains per-page chat history
+* Respects domain restrictions
+
+---
+
+# **👤 Admin Usage**
+
+### Create Admin User
+
+```bash
+python make_admin_script.py
+```
+
+### Admin Privileges
+
+* Can access **Admin Panel** from sidebar
+* Manage all system users
+* Reset passwords securely
+
+---
+
+# **🧪 Example Code Snippet (Dashboard Structure)**
+
+Each dashboard follows the same structure:
+
+```python
+st.title("📊 Data Science")
+
+df = load_data()
+
+# KPIs
+c1, c2, c3 = st.columns(3)
+c1.metric("Datasets", len(df))
+
+# Visuals
+fig = px.histogram(df, x="rows")
+st.plotly_chart(fig)
+
+# AI Assistant
+assistant = AIAssistant(role_prompt="...")
+reply = assistant.ask(query, context)
+st.write(reply)
+```
+
+Consistent architecture = easy extension + easy maintenance.
+
+---
+
+# **📌 Key Highlights**
+
+✔ Clean modular architecture
+✔ Fully role-based
+✔ AI-powered insights
+✔ Beginner-friendly dashboards
+✔ Automatic database setup
+✔ Works offline except AI calls
+✔ Ready for deployment
+
+---
+
+# **📄 License**
+
+This project is created for academic coursework and learning purposes.
+
