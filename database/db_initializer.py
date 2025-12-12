@@ -17,7 +17,6 @@ CSV_MAP = {
     "datasets_metadata.csv": "datasets",
 }
 
-
 # ----------------------------------------------------------
 # 1. CREATE ALL TABLES
 # ----------------------------------------------------------
@@ -51,17 +50,16 @@ def _create_schema(conn):
     )
     """)
 
-    # IT TICKETS (correct structure)
+    # IT TICKETS — MATCHING THE MODEL EXACTLY
     cur.execute("""
     CREATE TABLE IF NOT EXISTS it_tickets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ticket_id TEXT,
-        title TEXT,
+        ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        priority TEXT,
         description TEXT,
         status TEXT,
-        priority TEXT,
         assigned_to TEXT,
-        created_at TEXT
+        created_at TEXT,
+        resolution_time_hours REAL
     )
     """)
 
@@ -88,34 +86,25 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
     cur = conn.cursor()
     cur.execute(f"SELECT COUNT(*) FROM {table_name}")
     if cur.fetchone()[0] > 0:
-        return  # table already populated
+        return  # already populated
 
     if not csv_path.exists():
-        return  # CSV missing
+        return
 
-    # -------------------------------
-    # LOAD DATASETS METADATA
-    # -------------------------------
+    # DATASETS
     if table_name == "datasets":
         df = pd.read_csv(
             csv_path,
             header=None,
             names=["id", "dataset_name", "rows", "file_size_mb", "owner", "last_updated"]
         )
-
-        # remove id column
         df = df.drop(columns=["id"], errors="ignore")
-
-        # type enforcement
         df["rows"] = pd.to_numeric(df["rows"], errors="coerce").fillna(0).astype(int)
         df["file_size_mb"] = pd.to_numeric(df["file_size_mb"], errors="coerce").fillna(0.0)
-
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
 
-    # -------------------------------
-    # LOAD CYBER INCIDENTS
-    # -------------------------------
+    # CYBER INCIDENTS
     if table_name == "cyber_incidents":
         df = pd.read_csv(
             csv_path,
@@ -127,38 +116,29 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
             ],
             dtype=str
         )
-
-        # fill missing columns if CSV is shorter
         if "reported_by" not in df.columns:
             df["reported_by"] = "unknown"
         if "asset" not in df.columns:
             df["asset"] = "unknown"
-
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
 
-    # -------------------------------
-    # LOAD IT TICKETS
-    # -------------------------------
+    # IT TICKETS (FINAL, CORRECT VERSION)
     if table_name == "it_tickets":
         df = pd.read_csv(csv_path, header=None)
 
-        # Standard full format
-        if df.shape[1] >= 7:
-            df = df.iloc[:, :7]
-            df.columns = [
-                "ticket_id", "title", "description",
-                "status", "priority", "assigned_to",
-                "created_at"
-            ]
-        else:
-            # fallback (rare)
-            df = df.astype(str)
-            for col in ["ticket_id", "title", "description", "status", "priority", "assigned_to", "created_at"]:
-                if col not in df.columns:
-                    df[col] = None
+        # Expected CSV format:
+        # priority, description, status, assigned_to, created_at
+        df.columns = [
+            "priority",
+            "description",
+            "status",
+            "assigned_to",
+            "created_at"
+        ]
 
-        df = df[["ticket_id", "title", "description", "status", "priority", "assigned_to", "created_at"]]
+        df["resolution_time_hours"] = None  # missing field
+
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
 
@@ -170,10 +150,8 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
 def init_database():
     conn = connect_database()
 
-    # Step 1 — Create all tables
     _create_schema(conn)
 
-    # Step 2 — Load CSVs (only if tables are empty)
     for csv_name, table_name in CSV_MAP.items():
         csv_path = DATA_DIR / csv_name
         _safe_load_csv(conn, csv_path, table_name)

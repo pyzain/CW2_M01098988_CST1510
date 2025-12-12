@@ -1,14 +1,7 @@
-# app/models/it_ticket.py
 """
-IT Ticket Model — Simple, stable, production-ready.
+IT Ticket Model — stable and aligned with DB schema.
 
-This file handles:
-1. Creating a new IT ticket
-2. Fetching all tickets (DataFrame)
-3. Updating ticket status
-4. Fetching a ticket by ID
-
-Database Schema:
+Schema (final):
     ticket_id INTEGER PRIMARY KEY AUTOINCREMENT
     priority TEXT
     description TEXT
@@ -22,14 +15,11 @@ from typing import Optional, Dict
 import pandas as pd
 from database.db import connect_database
 
-
 # -------------------------------------------------------
 # Create a new ticket
 # -------------------------------------------------------
+
 def create_ticket(priority: str, description: str, assigned_to: str = "unassigned") -> int:
-    """
-    Create a new ticket and return the generated ticket_id.
-    """
     conn = connect_database()
     cursor = conn.cursor()
 
@@ -45,19 +35,15 @@ def create_ticket(priority: str, description: str, assigned_to: str = "unassigne
     conn.commit()
     ticket_id = cursor.lastrowid
     conn.close()
+
     return ticket_id
 
+# -------------------------------------------------------
+# Get all tickets as DataFrame
+# -------------------------------------------------------
 
-# -------------------------------------------------------
-# Get all tickets as a DataFrame
-# -------------------------------------------------------
 def get_all_tickets_df() -> pd.DataFrame:
-    """
-    Returns all IT tickets as a Pandas DataFrame.
-    Used for dashboards, analytics, and Streamlit tables.
-    """
     conn = connect_database()
-
     try:
         df = pd.read_sql_query(
             """
@@ -75,7 +61,6 @@ def get_all_tickets_df() -> pd.DataFrame:
             conn,
         )
     except Exception:
-        # Return empty DataFrame with correct columns (prevents Streamlit crashes)
         df = pd.DataFrame(
             columns=[
                 "ticket_id",
@@ -92,15 +77,11 @@ def get_all_tickets_df() -> pd.DataFrame:
 
     return df
 
+# -------------------------------------------------------
+# Update ticket status
+# -------------------------------------------------------
 
-# -------------------------------------------------------
-# Update a ticket's status
-# -------------------------------------------------------
-def update_ticket_status(ticket_id: int, new_status: str, resolution_time_hours: Optional[float] = None) -> None:
-    """
-    Update the status of a ticket.
-    If resolution_time_hours is provided, it will be saved.
-    """
+def update_ticket_status(ticket_id: int, new_status: str, resolution_time_hours: Optional[float] = None):
     conn = connect_database()
     cursor = conn.cursor()
 
@@ -117,18 +98,13 @@ def update_ticket_status(ticket_id: int, new_status: str, resolution_time_hours:
     conn.commit()
     conn.close()
 
+# -------------------------------------------------------
+# Fetch a ticket by ID
+# -------------------------------------------------------
 
-# -------------------------------------------------------
-# Fetch a single ticket by ID
-# -------------------------------------------------------
 def get_ticket_by_id(ticket_id: int) -> Optional[Dict]:
-    """
-    Return a single ticket as a dictionary.
-    Returns None if the ticket doesn't exist.
-    """
     conn = connect_database()
 
-    # Return rows as Python dictionaries
     conn.row_factory = lambda cursor, row: {
         "ticket_id": row[0],
         "priority": row[1],
