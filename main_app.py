@@ -4,6 +4,9 @@ from database.db_initializer import init_database
 from app.services.database_manager import DatabaseManager
 from app.services.auth_manager import AuthManager
 
+# When a fresh clone runs → database + CSV data load automatically
+from database.db_initializer import init_database
+init_database()
 
 # Utility for reruns
 def safe_rerun():

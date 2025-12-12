@@ -106,8 +106,8 @@ CW2_M01098988_CST1510/
 ### **1️⃣ Clone the Repository**
 
 ```bash
-git clone https://github.com/your-username/mdi-platform.git
-cd mdi-platform
+git clone https://github.com/pyzain/CW2_M01098988_CST1510.git
+cd CW2_M01098988_CST1510
 ```
 
 ### **2️⃣ Install Requirements**

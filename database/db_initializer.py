@@ -1,7 +1,8 @@
-# database/db_initializer.py
 """
-Create schema and import CSVs if tables are empty (idempotent).
+Creates the full database schema and imports CSV data exactly once.
+Safe on reload (idempotent).
 """
+
 import pandas as pd
 from pathlib import Path
 from database.db import connect_database
@@ -17,10 +18,14 @@ CSV_MAP = {
 }
 
 
+# ----------------------------------------------------------
+# 1. CREATE ALL TABLES
+# ----------------------------------------------------------
+
 def _create_schema(conn):
     cur = conn.cursor()
 
-    # users
+    # USERS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +36,7 @@ def _create_schema(conn):
     )
     """)
 
-    # cyber_incidents (normalized columns)
+    # CYBER INCIDENTS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS cyber_incidents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +51,7 @@ def _create_schema(conn):
     )
     """)
 
-    # it_tickets
+    # IT TICKETS (correct structure)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS it_tickets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +65,7 @@ def _create_schema(conn):
     )
     """)
 
-    # datasets
+    # DATASETS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS datasets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,88 +80,107 @@ def _create_schema(conn):
     conn.commit()
 
 
+# ----------------------------------------------------------
+# 2. LOAD CSV DATA ONLY IF TABLE IS EMPTY
+# ----------------------------------------------------------
+
 def _safe_load_csv(conn, csv_path: Path, table_name: str):
-    """Load CSV into table only if table is empty. This prevents duplicate inserts on reloads."""
     cur = conn.cursor()
-    cur.execute(f"SELECT COUNT(1) as cnt FROM {table_name}")
-    cnt = cur.fetchone()[0]
-    if cnt > 0:
-        # already populated
-        return
+    cur.execute(f"SELECT COUNT(*) FROM {table_name}")
+    if cur.fetchone()[0] > 0:
+        return  # table already populated
 
     if not csv_path.exists():
-        return
+        return  # CSV missing
 
-    # Read CSVs carefully according to expected format
+    # -------------------------------
+    # LOAD DATASETS METADATA
+    # -------------------------------
     if table_name == "datasets":
-        # datasets_metadata.csv: id,dataset_name,rows,file_size_mb,owner,last_updated
-        df = pd.read_csv(csv_path, header=None, names=["id", "dataset_name", "rows", "file_size_mb", "owner", "last_updated"])
-        df = df.drop(columns=[c for c in ["id"] if c in df.columns])
-        # ensure types
+        df = pd.read_csv(
+            csv_path,
+            header=None,
+            names=["id", "dataset_name", "rows", "file_size_mb", "owner", "last_updated"]
+        )
+
+        # remove id column
+        df = df.drop(columns=["id"], errors="ignore")
+
+        # type enforcement
         df["rows"] = pd.to_numeric(df["rows"], errors="coerce").fillna(0).astype(int)
         df["file_size_mb"] = pd.to_numeric(df["file_size_mb"], errors="coerce").fillna(0.0)
-        df.to_sql(table_name, conn, if_exists="append", index=False)
 
-    elif table_name == "cyber_incidents":
-        # cyber_incidents.csv: external_id,timestamp,severity,incident_type,status,description[,asset]
-        df = pd.read_csv(csv_path, header=None, names=["external_id","timestamp","severity","incident_type","status","description"], dtype=str)
-        # If CSV contains asset as 7th column, capture it
-        if df.shape[1] > 6:
-            # already captured
-            pass
-        # Append with defaults
-        df = df.assign(asset="unknown", reported_by="unknown")
         df.to_sql(table_name, conn, if_exists="append", index=False)
+        return
 
-    elif table_name == "it_tickets":
-        # it_tickets.csv sample: ticket_id,created_at,priority,status,category,subject,description,assigned_to
+    # -------------------------------
+    # LOAD CYBER INCIDENTS
+    # -------------------------------
+    if table_name == "cyber_incidents":
+        df = pd.read_csv(
+            csv_path,
+            header=None,
+            names=[
+                "external_id", "timestamp", "severity",
+                "incident_type", "status", "description",
+                "reported_by", "asset"
+            ],
+            dtype=str
+        )
+
+        # fill missing columns if CSV is shorter
+        if "reported_by" not in df.columns:
+            df["reported_by"] = "unknown"
+        if "asset" not in df.columns:
+            df["asset"] = "unknown"
+
+        df.to_sql(table_name, conn, if_exists="append", index=False)
+        return
+
+    # -------------------------------
+    # LOAD IT TICKETS
+    # -------------------------------
+    if table_name == "it_tickets":
         df = pd.read_csv(csv_path, header=None)
-        # Try to map by number of columns (best-effort)
-        if df.shape[1] >= 8:
-            df = df.iloc[:, :8]
-            df.columns = ["ticket_id","created_at","priority","status","category","title","description","assigned_to"]
-            df = df.rename(columns={"created_at":"created_at", "title":"title"})
-        else:
-            # fallback: store raw text
-            df = pd.DataFrame(df.iloc[:, :].astype(str))
-        # keep columns consistent with DB
-        # create placeholder columns if missing
-        for col in ["ticket_id","title","description","status","priority","assigned_to","created_at"]:
-            if col not in df.columns:
-                df[col] = None
-        df = df[["ticket_id","title","description","status","priority","assigned_to","created_at"]]
-        df.to_sql(table_name, conn, if_exists="append", index=False)
 
+        # Standard full format
+        if df.shape[1] >= 7:
+            df = df.iloc[:, :7]
+            df.columns = [
+                "ticket_id", "title", "description",
+                "status", "priority", "assigned_to",
+                "created_at"
+            ]
+        else:
+            # fallback (rare)
+            df = df.astype(str)
+            for col in ["ticket_id", "title", "description", "status", "priority", "assigned_to", "created_at"]:
+                if col not in df.columns:
+                    df[col] = None
+
+        df = df[["ticket_id", "title", "description", "status", "priority", "assigned_to", "created_at"]]
+        df.to_sql(table_name, conn, if_exists="append", index=False)
+        return
+
+
+# ----------------------------------------------------------
+# 3. MAIN INITIALIZER
+# ----------------------------------------------------------
 
 def init_database():
     conn = connect_database()
-    cur = conn.cursor()
 
-    cur.execute("""
-                CREATE TABLE IF NOT EXISTS it_tickets
-                (
-                    ticket_id
-                    INTEGER
-                    PRIMARY
-                    KEY
-                    AUTOINCREMENT,
-                    priority
-                    TEXT,
-                    description
-                    TEXT,
-                    status
-                    TEXT,
-                    assigned_to
-                    TEXT,
-                    created_at
-                    TEXT,
-                    resolution_time_hours
-                    REAL
-                )
-                """)
+    # Step 1 — Create all tables
+    _create_schema(conn)
+
+    # Step 2 — Load CSVs (only if tables are empty)
+    for csv_name, table_name in CSV_MAP.items():
+        csv_path = DATA_DIR / csv_name
+        _safe_load_csv(conn, csv_path, table_name)
 
     conn.commit()
     conn.close()
+
 
 if __name__ == "__main__":
     init_database()
