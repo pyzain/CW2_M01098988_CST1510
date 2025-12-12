@@ -1,11 +1,24 @@
 # main_app.py
 import streamlit as st
-from database.db_initializer import init_database
+from PIL import Image
+
 from app.services.database_manager import DatabaseManager
 from app.services.auth_manager import AuthManager
+from database.db_initializer import init_database
+
+# ----------------------------
+# Page config + App Icon
+# ----------------------------
+icon = Image.open("img/app_icon.png")
+
+st.set_page_config(
+    page_title="MDI Platform",
+    page_icon=icon,
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # When a fresh clone runs → database + CSV data load automatically
-from database.db_initializer import init_database
 init_database()
 
 # Utility for reruns
@@ -13,11 +26,7 @@ def safe_rerun():
     if hasattr(st, "rerun"):
         st.rerun()
     elif hasattr(st, "experimental_rerun"):
-        st.rerun()
-
-
-# Page config
-st.set_page_config(page_title="MDI Platform", layout="wide", initial_sidebar_state="expanded")
+        st.experimental_rerun()
 
 # Hide Streamlit default menu
 hide_streamlit_style = """
@@ -30,7 +39,6 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Initialize DB + managers
-init_database()
 _db = DatabaseManager()
 _auth = AuthManager(_db)
 
