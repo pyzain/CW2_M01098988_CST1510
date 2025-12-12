@@ -123,11 +123,11 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
 
-    # IT TICKETS (FINAL, CORRECTED VERSION)
+    # IT TICKETS (FINAL, DATATYPE SAFE)
     if table_name == "it_tickets":
         df = pd.read_csv(csv_path, header=None)
 
-        # Correct column names matching CSV and DB schema
+        # Column names matching CSV and DB schema
         df.columns = [
             "ticket_id",
             "priority",
@@ -137,6 +137,10 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
             "created_at",
             "resolution_time_hours"
         ]
+
+        # Ensure correct datatypes to prevent SQLite errors
+        df["ticket_id"] = pd.to_numeric(df["ticket_id"], errors="coerce").fillna(0).astype(int)
+        df["resolution_time_hours"] = pd.to_numeric(df["resolution_time_hours"], errors="coerce").fillna(0.0)
 
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
