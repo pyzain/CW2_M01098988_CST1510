@@ -123,25 +123,23 @@ def _safe_load_csv(conn, csv_path: Path, table_name: str):
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
 
-    # IT TICKETS (FINAL, CORRECT VERSION)
+    # IT TICKETS (FINAL, CORRECTED VERSION)
     if table_name == "it_tickets":
         df = pd.read_csv(csv_path, header=None)
 
-        # Expected CSV format:
-        # priority, description, status, assigned_to, created_at
+        # Correct column names matching CSV and DB schema
         df.columns = [
+            "ticket_id",
             "priority",
             "description",
             "status",
             "assigned_to",
-            "created_at"
+            "created_at",
+            "resolution_time_hours"
         ]
-
-        df["resolution_time_hours"] = None  # missing field
 
         df.to_sql(table_name, conn, if_exists="append", index=False)
         return
-
 
 # ----------------------------------------------------------
 # 3. MAIN INITIALIZER
